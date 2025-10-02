@@ -1,7 +1,13 @@
 import { useAuth } from "../auth/AuthContext";
+import { useState } from "react";
+import StudentManagement from "../management/StudentManagement";
+import FacultyManagement from "../management/FacultyManagement";
+import CourseManagement from "../management/CourseManagement";
+import InfrastructureManagement from "../management/InfrastructureManagement";
 
 export default function AdminDashboard() {
   const { userEmail, logout } = useAuth();
+  const [activeTab, setActiveTab] = useState<'students' | 'faculty' | 'courses' | 'infra'>('students');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
@@ -475,6 +481,23 @@ export default function AdminDashboard() {
                 />
               </svg>
             </button>
+          </div>
+        </div>
+
+        {/* Management Section */}
+        <div className="mt-10">
+          <h3 className="text-xl font-semibold text-gray-900 mb-4">Data Management</h3>
+          <div className="flex items-center gap-2 mb-4 overflow-x-auto">
+            <button onClick={() => setActiveTab('students')} className={`px-4 py-2 rounded-lg text-sm font-medium border ${activeTab === 'students' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Students</button>
+            <button onClick={() => setActiveTab('faculty')} className={`px-4 py-2 rounded-lg text-sm font-medium border ${activeTab === 'faculty' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Faculty</button>
+            <button onClick={() => setActiveTab('courses')} className={`px-4 py-2 rounded-lg text-sm font-medium border ${activeTab === 'courses' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Courses</button>
+            <button onClick={() => setActiveTab('infra')} className={`px-4 py-2 rounded-lg text-sm font-medium border ${activeTab === 'infra' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Infrastructure</button>
+          </div>
+          <div className="space-y-6">
+            {activeTab === 'students' && <StudentManagement />}
+            {activeTab === 'faculty' && <FacultyManagement />}
+            {activeTab === 'courses' && <CourseManagement />}
+            {activeTab === 'infra' && <InfrastructureManagement />}
           </div>
         </div>
       </main>

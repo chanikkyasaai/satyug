@@ -1,7 +1,206 @@
 import { useAuth } from "../auth/AuthContext";
+import { useRef } from "react";
+// excel export will be loaded dynamically to avoid type resolution issues
 
 export default function StudentDashboard() {
   const { userEmail, logout } = useAuth();
+  const timetableRef = useRef<HTMLDivElement | null>(null);
+
+  type CourseType = 'core' | 'lab' | 'elective'
+  type Day = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday'
+  type Course = {
+    course: string
+    code: string
+    room: string
+    instructor: string
+    type: CourseType
+  }
+  type Slot = {
+    time: string
+    days: Record<Day, Course | null>
+  }
+
+  // Sample timetable data
+  const timetableData: Slot[] = [
+    {
+      time: "9:00 - 10:30",
+      days: {
+        monday: {
+          course: "Advanced Algorithms",
+          code: "CS-401",
+          room: "A-102",
+          instructor: "Dr. Smith",
+          type: "core",
+        },
+        tuesday: null,
+        wednesday: {
+          course: "Advanced Algorithms",
+          code: "CS-401",
+          room: "A-102",
+          instructor: "Dr. Smith",
+          type: "core",
+        },
+        thursday: null,
+        friday: {
+          course: "Advanced Algorithms",
+          code: "CS-401",
+          room: "A-102",
+          instructor: "Dr. Smith",
+          type: "core",
+        },
+      },
+    },
+    {
+      time: "11:00 - 12:30",
+      days: {
+        monday: null,
+        tuesday: {
+          course: "Data Structures Lab",
+          code: "CS-301",
+          room: "Lab B-205",
+          instructor: "Prof. Johnson",
+          type: "lab",
+        },
+        wednesday: null,
+        thursday: {
+          course: "Data Structures Lab",
+          code: "CS-301",
+          room: "Lab B-205",
+          instructor: "Prof. Johnson",
+          type: "lab",
+        },
+        friday: null,
+      },
+    },
+    {
+      time: "2:00 - 3:30",
+      days: {
+        monday: {
+          course: "Software Engineering",
+          code: "CS-501",
+          room: "C-301",
+          instructor: "Dr. Williams",
+          type: "elective",
+        },
+        tuesday: null,
+        wednesday: {
+          course: "Software Engineering",
+          code: "CS-501",
+          room: "C-301",
+          instructor: "Dr. Williams",
+          type: "elective",
+        },
+        thursday: null,
+        friday: null,
+      },
+    },
+    {
+      time: "4:00 - 5:30",
+      days: {
+        monday: null,
+        tuesday: {
+          course: "Database Systems",
+          code: "CS-401",
+          room: "D-201",
+          instructor: "Dr. Brown",
+          type: "core",
+        },
+        wednesday: null,
+        thursday: {
+          course: "Database Systems",
+          code: "CS-401",
+          room: "D-201",
+          instructor: "Dr. Brown",
+          type: "core",
+        },
+        friday: null,
+      },
+    },
+  ];
+
+  const getCourseColor = (type: CourseType) => {
+    const colors: Record<CourseType, string> = {
+      core: "bg-blue-50 border border-blue-200",
+      lab: "bg-green-50 border border-green-200",
+      elective: "bg-purple-50 border border-purple-200",
+    };
+    return colors[type] ?? "bg-gray-50 border border-gray-200";
+  };
+
+  const getTextColor = (type: CourseType) => {
+    const colors: Record<CourseType, { title: string; detail: string }> = {
+      core: { title: "text-blue-900", detail: "text-blue-600" },
+      lab: { title: "text-green-900", detail: "text-green-600" },
+      elective: { title: "text-purple-900", detail: "text-purple-600" },
+    };
+    return colors[type] ?? { title: "text-gray-900", detail: "text-gray-600" };
+  };
+
+  const downloadPDF = () => {
+    if (!timetableRef.current) return;
+    const content = timetableRef.current.outerHTML;
+    const win = window.open("", "_blank", "noopener,noreferrer");
+    if (!win) return;
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8" />
+    <title>Student Timetable</title>
+    <style>
+      body { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; padding: 24px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #e5e7eb; padding: 12px; vertical-align: top; }
+      th { background: #f3f4f6; text-align: left; font-weight: 600; }
+      .rounded-2xl { border-radius: 1rem; }
+    </style>
+    </head><body onload="window.print(); window.onafterprint = function(){ window.close(); }">
+    <h2 style="margin:0 0 16px 0;">Student Timetable</h2>
+    ${content}
+    </body></html>`);
+    win.document.close();
+  };
+
+  const downloadExcel = async () => {
+    const ExcelJS: any = await import('exceljs');
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Timetable");
+
+    worksheet.addRow(["Student Timetable - Spring 2024"]);
+    worksheet.addRow([""]);
+    worksheet.addRow(["Time/Day", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
+
+    timetableData.forEach((slot) => {
+      const row: string[] = [slot.time];
+      (['monday','tuesday','wednesday','thursday','friday'] as Day[]).forEach((day) => {
+        const course = slot.days[day];
+        if (course) {
+          row.push(`${course.course}\n${course.code} - ${course.room}\n${course.instructor}`);
+        } else {
+          row.push('-');
+        }
+      });
+      worksheet.addRow(row);
+    });
+
+    worksheet.columns = [
+      { width: 14 },
+      { width: 28 },
+      { width: 28 },
+      { width: 28 },
+      { width: 28 },
+      { width: 28 },
+    ];
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'student-timetable.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const days: Day[] = ['monday','tuesday','wednesday','thursday','friday']
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50">
@@ -73,7 +272,10 @@ export default function StudentDashboard() {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <button className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition-all duration-200 flex items-center gap-2">
+                  <button
+                    onClick={downloadPDF}
+                    className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-50 transition-all duration-200 flex items-center gap-2"
+                  >
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -89,7 +291,10 @@ export default function StudentDashboard() {
                     </svg>
                     PDF
                   </button>
-                  <button className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-200 flex items-center gap-2">
+                  <button
+                    onClick={downloadExcel}
+                    className="px-4 py-2 rounded-lg bg-gradient-to-r from-green-600 to-emerald-600 text-white font-medium hover:from-green-700 hover:to-emerald-700 transition-all duration-200 flex items-center gap-2"
+                  >
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -109,144 +314,75 @@ export default function StudentDashboard() {
               </div>
 
               {/* Timetable View */}
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
+              <div ref={timetableRef} className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300">
                   <thead>
-                    <tr className="bg-gray-50">
-                      <th className="p-3 text-left text-sm font-medium text-gray-700 border-b">
+                    <tr className="bg-gray-100">
+                      <th className="p-4 text-left text-sm font-semibold text-gray-700 border border-gray-300 bg-gray-150">
                         Time/Day
                       </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-700 border-b">
+                      <th className="p-4 text-left text-sm font-semibold text-gray-700 border border-gray-300 bg-gray-150">
                         Monday
                       </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-700 border-b">
+                      <th className="p-4 text-left text-sm font-semibold text-gray-700 border border-gray-300 bg-gray-150">
                         Tuesday
                       </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-700 border-b">
+                      <th className="p-4 text-left text-sm font-semibold text-gray-700 border border-gray-300 bg-gray-150">
                         Wednesday
                       </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-700 border-b">
+                      <th className="p-4 text-left text-sm font-semibold text-gray-700 border border-gray-300 bg-gray-150">
                         Thursday
                       </th>
-                      <th className="p-3 text-left text-sm font-medium text-gray-700 border-b">
+                      <th className="p-4 text-left text-sm font-semibold text-gray-700 border border-gray-300 bg-gray-150">
                         Friday
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {/* 9:00 AM - 10:30 AM */}
-                    <tr>
-                      <td className="p-3 text-sm font-medium text-gray-900 border-b">
-                        9:00 - 10:30
-                      </td>
-                      <td className="p-3 border-b">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                          <p className="font-medium text-blue-900">
-                            Advanced Algorithms
-                          </p>
-                          <p className="text-xs text-blue-600">
-                            CS-401 • Room A-102
-                          </p>
-                          <p className="text-xs text-blue-600">Dr. Smith</p>
-                        </div>
-                      </td>
-                      <td className="p-3 border-b"></td>
-                      <td className="p-3 border-b">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                          <p className="font-medium text-blue-900">
-                            Advanced Algorithms
-                          </p>
-                          <p className="text-xs text-blue-600">
-                            CS-401 • Room A-102
-                          </p>
-                          <p className="text-xs text-blue-600">Dr. Smith</p>
-                        </div>
-                      </td>
-                      <td className="p-3 border-b"></td>
-                      <td className="p-3 border-b">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-2">
-                          <p className="font-medium text-blue-900">
-                            Advanced Algorithms
-                          </p>
-                          <p className="text-xs text-blue-600">
-                            CS-401 • Room A-102
-                          </p>
-                          <p className="text-xs text-blue-600">Dr. Smith</p>
-                        </div>
-                      </td>
-                    </tr>
+                    {timetableData.map((slot, index) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="p-4 text-sm font-medium text-gray-900 border border-gray-300 bg-gray-50 whitespace-nowrap">
+                          {slot.time}
+                        </td>
+                        {days.map((day) => {
+                          const course = slot.days[day];
+                          const colors = getTextColor(course?.type as CourseType);
 
-                    {/* 11:00 AM - 12:30 PM */}
-                    <tr>
-                      <td className="p-3 text-sm font-medium text-gray-900 border-b">
-                        11:00 - 12:30
-                      </td>
-                      <td className="p-3 border-b"></td>
-                      <td className="p-3 border-b">
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-2">
-                          <p className="font-medium text-green-900">
-                            Data Structures Lab
-                          </p>
-                          <p className="text-xs text-green-600">
-                            CS-301 • Lab B-205
-                          </p>
-                          <p className="text-xs text-green-600">
-                            Prof. Johnson
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3 border-b"></td>
-                      <td className="p-3 border-b">
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-2">
-                          <p className="font-medium text-green-900">
-                            Data Structures Lab
-                          </p>
-                          <p className="text-xs text-green-600">
-                            CS-301 • Lab B-205
-                          </p>
-                          <p className="text-xs text-green-600">
-                            Prof. Johnson
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3 border-b"></td>
-                    </tr>
-
-                    {/* 2:00 PM - 3:30 PM */}
-                    <tr>
-                      <td className="p-3 text-sm font-medium text-gray-900 border-b">
-                        2:00 - 3:30
-                      </td>
-                      <td className="p-3 border-b">
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                          <p className="font-medium text-purple-900">
-                            Software Engineering
-                          </p>
-                          <p className="text-xs text-purple-600">
-                            CS-501 • Room C-301
-                          </p>
-                          <p className="text-xs text-purple-600">
-                            Dr. Williams
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3 border-b"></td>
-                      <td className="p-3 border-b">
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-                          <p className="font-medium text-purple-900">
-                            Software Engineering
-                          </p>
-                          <p className="text-xs text-purple-600">
-                            CS-501 • Room C-301
-                          </p>
-                          <p className="text-xs text-purple-600">
-                            Dr. Williams
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3 border-b"></td>
-                      <td className="p-3 border-b"></td>
-                    </tr>
+                          return (
+                            <td
+                              key={day}
+                              className="p-3 border border-gray-300 align-top min-w-[200px]"
+                            >
+                              {course ? (
+                                <div
+                                  className={`${getCourseColor(
+                                    course.type
+                                  )} rounded-lg p-3 h-full`}
+                                >
+                                  <p
+                                    className={`font-medium ${colors.title} mb-1`}
+                                  >
+                                    {course.course}
+                                  </p>
+                                  <p
+                                    className={`text-xs ${colors.detail} mb-1`}
+                                  >
+                                    {course.code} • {course.room}
+                                  </p>
+                                  <p className={`text-xs ${colors.detail}`}>
+                                    {course.instructor}
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="text-gray-400 text-center py-4">
+                                  -
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
