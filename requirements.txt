@@ -1,0 +1,28 @@
+# Core Framework
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+
+# Database
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+alembic==1.13.2
+
+# Pydantic
+pydantic==2.7.1
+pydantic-settings==2.3.1
+
+# OR-Tools
+ortools==9.10.4067
+
+# Utilities
+python-dotenv==1.0.1
+passlib[bcrypt]==1.7.4
+email-validator==2.2.0
+
+# Testing
+pytest==8.2.1
+httpx==0.27.0
+
+# Additional Python 3.12 compatible packages you might want:
+# typing-extensions==4.12.2  # For additional type hints
+# anyio==4.4.0              # Async compatibility
