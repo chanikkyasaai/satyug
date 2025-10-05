@@ -1,5 +1,4 @@
-# backend/services/optimizer.py
-from typing import List, Dict, Any
+from typing import Any, List, Dict
 from sqlalchemy.orm import Session
 
 from models import Course, Faculty, DisruptionLog, OptimizationResult
@@ -8,75 +7,117 @@ from utils.scoring import score_solution
 from datetime import datetime
 
 
-def find_candidate_faculty(db: Session, course: Course) -> List[Dict[str, Any]]:
-    """
-    Simple candidate search:
-      - All faculty who are marked available
-      - Return dicts with current workload computed
-    """
-    facs = db.query(Faculty).all()
+def _is_supabase(db: Any) -> bool:
+    return db is not None and hasattr(db, "table")
+
+
+def _resp_data(resp: Any):
+    if resp is None:
+        return None
+    data = getattr(resp, "data", None)
+    if data is not None:
+        return data
+    try:
+        return resp.get("data")
+    except Exception:
+        return None
+
+
+def find_candidate_faculty(db: Any, course: Any) -> List[Dict[str, Any]]:
     candidates: List[Dict[str, Any]] = []
-    for f in facs:
-        # compute current workload (number of courses assigned)
-        cur_workload = db.query(Course).filter(Course.faculty_id == f.id).count()
-        candidates.append({
-            "id": f.id,
-            "name": f.name,
-            "expertise": f.expertise or "",
-            "workload": cur_workload,
-            "workload_cap": f.workload_cap or 3,
-            "available": getattr(f, "available", True),
-        })
-    # filter out same faculty assigned to course (or optionally exclude faculty_unavailable)
+    if _is_supabase(db):
+        resp = db.table("faculty").select("*").execute()
+        facs = _resp_data(resp) or []
+        for f in facs:
+            resp2 = db.table("courses").select("*").eq("faculty_id", f["id"]).execute()
+            cur_workload = len(_resp_data(resp2) or [])
+            candidates.append({
+                "id": f["id"],
+                "name": f.get("name"),
+                "expertise": f.get("expertise", "") or "",
+                "workload": cur_workload,
+                "workload_cap": int(f.get("workload_cap", 3) or 3),
+                "available": f.get("available", True),
+            })
+    else:
+        facs = db.query(Faculty).all()
+        for f in facs:
+            cur_workload = db.query(Course).filter(Course.faculty_id == f.id).count()
+            candidates.append({
+                "id": f.id,
+                "name": f.name,
+                "expertise": f.expertise or "",
+                "workload": cur_workload,
+                "workload_cap": f.workload_cap or 3,
+                "available": getattr(f, "available", True),
+            })
     return candidates
 
 
-def optimize_faculty_assignment(db: Session, course_id: int, faculty_unavailable: int) -> List[Dict[str, Any]]:
-    """
-    For a single course, return ranked candidate replacements with scores.
-    Steps:
-      - fetch course
-      - gather candidate faculty
-      - compute score with scoring module
-      - return list sorted by score (desc)
-    """
-    course = db.query(Course).filter(Course.id == course_id).first()
-    if not course:
-        raise ValueError("Course not found")
+def optimize_faculty_assignment(db: Any, course_id: int, faculty_unavailable: int) -> List[Dict[str, Any]]:
+    if _is_supabase(db):
+        resp = db.table("courses").select("*").eq("id", course_id).execute()
+        course = (_resp_data(resp) or [None])[0]
+        if not course:
+            raise ValueError("Course not found")
+    else:
+        course = db.query(Course).filter(Course.id == course_id).first()
+        if not course:
+            raise ValueError("Course not found")
 
     candidates = find_candidate_faculty(db, course)
 
-    # optionally exclude the faculty_unavailable and the current assigned faculty
     filtered: List[Dict[str, Any]] = []
     for c in candidates:
         if faculty_unavailable and c["id"] == faculty_unavailable:
             continue
-        if course.faculty_id is not None and c["id"] == course.faculty_id:
+        course_faculty_id = course.get("faculty_id") if isinstance(course, dict) else course.faculty_id
+        if course_faculty_id is not None and c["id"] == course_faculty_id:
             continue
         filtered.append(c)
 
     solutions: List[Dict[str, Any]] = []
     for cand in filtered:
-        s = score_solution(cand, {"id": course.id, "name": course.name})
+        course_payload = {"id": course["id"], "name": course.get("name")} if isinstance(course, dict) else {"id": course.id, "name": course.name}
+        s = score_solution(cand, course_payload)
         rank = "Compromise"
         if s >= 90:
             rank = "Best"
         elif s >= 50:
             rank = "Good"
-        solutions.append({
-            "faculty": cand,
-            "score": s,
-            "rank": rank,
-        })
+        solutions.append({"faculty": cand, "score": s, "rank": rank})
 
     solutions.sort(key=lambda x: x["score"], reverse=True)
     return solutions
 
 
-def record_disruption_and_solutions(db: Session, course_id: int, faculty_unavailable: int, reason: str) -> Dict[str, Any]:
-    """
-    Create disruption log entry and compute candidate solutions, store them in optimization_results table for auditing.
-    """
+def record_disruption_and_solutions(db: Any, course_id: int, faculty_unavailable: int, reason: str) -> Dict[str, Any]:
+    if _is_supabase(db):
+        disruption_row = {
+            "course_id": course_id,
+            "faculty_unavailable": faculty_unavailable,
+            "reason": reason,
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": "pending",
+        }
+        resp = db.table("disruptions").insert([disruption_row]).execute()
+        ddata = _resp_data(resp) or []
+        disruption_id = ddata[0]["id"] if ddata else None
+
+        sols = optimize_faculty_assignment(db, course_id, faculty_unavailable)
+        rows = []
+        for s in sols[:10]:
+            rows.append({
+                "disruption_id": disruption_id,
+                "candidate_faculty_id": s["faculty"]["id"],
+                "score": s["score"],
+                "rank": s["rank"],
+                "approved": False,
+            })
+        if rows:
+            db.table("optimization_results").insert(rows).execute()
+        return {"disruption_id": disruption_id, "solutions_count": len(sols)}
+
     disruption = DisruptionLog(
         course_id=course_id,
         faculty_unavailable=faculty_unavailable,
@@ -89,7 +130,6 @@ def record_disruption_and_solutions(db: Session, course_id: int, faculty_unavail
     db.refresh(disruption)
 
     sols = optimize_faculty_assignment(db, course_id, faculty_unavailable)
-    # store top N solutions
     for idx, s in enumerate(sols[:10], start=1):
         orow = OptimizationResult(
             disruption_id=disruption.id,
@@ -103,11 +143,18 @@ def record_disruption_and_solutions(db: Session, course_id: int, faculty_unavail
     return {"disruption_id": disruption.id, "solutions_count": len(sols)}
 
 
-def apply_reassignment(db: Session, course_id: int, new_faculty_id: int, resolved_by: str = "system") -> Dict[str, Any]:
-    """
-    Update the course to point to new_faculty_id, mark disruption resolved if present and create audit record.
-    Must be called inside a transaction in caller code if needed.
-    """
+def apply_reassignment(db: Any, course_id: int, new_faculty_id: int, resolved_by: str = "system") -> Dict[str, Any]:
+    if _is_supabase(db):
+        resp = db.table("courses").select("*").eq("id", course_id).execute()
+        course = (_resp_data(resp) or [None])[0]
+        if not course:
+            return {"success": False, "message": "Course not found"}
+
+        old_faculty = course.get("faculty_id")
+        db.table("courses").update({"faculty_id": new_faculty_id}).eq("id", course_id).execute()
+        db.table("disruptions").update({"status": "resolved", "resolved_by": resolved_by}).eq("course_id", course_id).eq("status", "pending").execute()
+        return {"success": True, "course_id": course_id, "old_faculty": old_faculty, "new_faculty": new_faculty_id}
+
     course = db.query(Course).filter(Course.id == course_id).first()
     if not course:
         return {"success": False, "message": "Course not found"}
@@ -116,7 +163,6 @@ def apply_reassignment(db: Session, course_id: int, new_faculty_id: int, resolve
     setattr(course, "faculty_id", new_faculty_id)
     db.add(course)
 
-    # Update any disruption logs referencing old_faculty for this course and mark resolved
     disruptions = db.query(DisruptionLog).filter(DisruptionLog.course_id == course_id, DisruptionLog.status == "pending").all()
     for d in disruptions:
         setattr(d, "status", "resolved")
@@ -124,6 +170,6 @@ def apply_reassignment(db: Session, course_id: int, new_faculty_id: int, resolve
         db.add(d)
 
     db.commit()
-    # Refresh
     db.refresh(course)
     return {"success": True, "course_id": course.id, "old_faculty": old_faculty, "new_faculty": new_faculty_id}
+

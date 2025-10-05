@@ -10,7 +10,7 @@ from schemas import EnrollmentCreate, EnrollmentOut
 router = APIRouter(prefix="/registration", tags=["Tier2"])
 
 @router.post("/validate")
-def api_validate_schedule(student_id: int, course_ids: List[int], db: Session = Depends(get_supabase)):
+def api_validate_schedule(student_id: int, course_ids: List[int], db = Depends(get_supabase)):
     """
     Validate a student's selected course list (real-time).
     Returns conflicts and suggestions (if any).
@@ -22,7 +22,7 @@ def api_validate_schedule(student_id: int, course_ids: List[int], db: Session = 
     return res
 
 @router.post("/enroll", response_model=EnrollmentOut)
-def api_enroll(enroll_in: EnrollmentCreate, db: Session = Depends(get_supabase)):
+def api_enroll(enroll_in: EnrollmentCreate, db = Depends(get_supabase)):
     """
     Enroll a student into a single course (endpoint called after validate success).
     """
