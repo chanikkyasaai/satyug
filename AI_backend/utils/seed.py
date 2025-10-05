@@ -1,66 +1,123 @@
-# backend/seed.py
-from sqlalchemy.orm import Session
-from database import SessionLocal, engine, Base
-import models
+"""Seed script using the Supabase client.
 
-def seed():
-    Base.metadata.drop_all(bind=engine)   # clear tables (for testing only!)
-    Base.metadata.create_all(bind=engine)
+This script will attempt to use the Supabase Python client (created in
+`AI_backend/database.py`) to insert sample rows for faculty, timeslots,
+classrooms, courses, students and enrollments.
 
-    db: Session = SessionLocal()
+Notes:
+- The Supabase client must be configured (SUPABASEURL & SUPABASEKEY) and
+  the server-side (service_role) key is required for inserts that touch
+  Postgres directly. Keep the service_role key secret.
+- This script inserts explicit `id` values so foreign keys can be set in
+  the same run. If your DB already contains conflicting ids, change/remove
+  the ids or run on a fresh DB.
+"""
 
-    # Faculty
-    f1 = models.Faculty(name="Dr. Sharma", email="sharma@uni.edu", expertise="Mathematics, AI", workload_cap=3, available=True)
-    f2 = models.Faculty(name="Prof. Reddy", email="reddy@uni.edu", expertise="Physics, Electronics", workload_cap=2, available=True)
-    f3 = models.Faculty(name="Dr. Mehta", email="mehta@uni.edu", expertise="Computer Science, Data Science", workload_cap=4, available=True)
+from typing import Any, Optional
+import sys
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
 
-    db.add_all([f1, f2, f3])
-    db.commit()
+load_dotenv()
 
-    # TimeSlots
-    ts1 = models.TimeSlot(day="Mon", start_time="09:00", end_time="10:00")
-    ts2 = models.TimeSlot(day="Mon", start_time="10:00", end_time="11:00")
-    ts3 = models.TimeSlot(day="Wed", start_time="14:00", end_time="15:00")
-    ts4 = models.TimeSlot(day="Fri", start_time="09:00", end_time="10:00")
+SUPABASEURL = os.getenv("SUPABASEURL")
+SUPABASEKEY = os.getenv("SUPABASEKEY")
 
-    db.add_all([ts1, ts2, ts3, ts4])
-    db.commit()
+if SUPABASEURL is None or SUPABASEKEY is None:
+    print("SUPABASEURL and SUPABASEKEY must be set in environment variables")
+    sys.exit(1)
+supabase: Optional[Client] = None
+try:
+    supabase = create_client(SUPABASEURL, SUPABASEKEY)
+except Exception as e:
+    print(f"Could not create Supabase client: {e}")
+    sys.exit(1)
+	
 
-    # Classrooms
-    c1 = models.Classroom(room_number="A101", capacity=60, building="Block A", resources="Projector")
-    c2 = models.Classroom(room_number="B202", capacity=40, building="Block B", resources="Lab, Projector")
+def _extract_data(resp: Any):
+	# supabase client .execute() may return an object/dict with data
+	if resp is None:
+		return None
+	# try attribute
+	data = getattr(resp, "data", None)
+	if data is not None:
+		return data
+	# try dict-like
+	try:
+		return resp.get("data")
+	except Exception:
+		return None
 
-    db.add_all([c1, c2])
-    db.commit()
 
-    # Courses
-    math1 = models.Course(code="MATH101", name="Calculus I", credits=3, semester=1, mandatory=True,
-                          faculty_id=f1.id, timeslot_id=ts1.id, classroom_id=c1.id, max_seats=50)
-    math2 = models.Course(code="MATH101", name="Calculus I", credits=3, semester=1, mandatory=True,
-                          faculty_id=f1.id, timeslot_id=ts3.id, classroom_id=c1.id, max_seats=50)  # alternative section
-    phy1 = models.Course(code="PHY101", name="Physics I", credits=4, semester=1, mandatory=True,
-                         faculty_id=f2.id, timeslot_id=ts2.id, classroom_id=c2.id, max_seats=40)
-    cs1 = models.Course(code="CS101", name="Introduction to Programming", credits=4, semester=1, mandatory=False,
-                        faculty_id=f3.id, timeslot_id=ts4.id, classroom_id=c2.id, max_seats=45)
+def seed_using_supabase(supabase_client: Any) -> None:
+	print("Seeding database via Supabase client...")
 
-    db.add_all([math1, math2, phy1, cs1])
-    db.commit()
+	# Define sample rows with explicit ids so FKs can reference them
+	# faculties = [
+	# 	{"id": 1, "name": "Dr. Sharma", "email": "sharma@uni.edu", "expertise": "Mathematics, AI", "workload_cap": 3, "available": True},
+	# 	{"id": 2, "name": "Prof. Reddy", "email": "reddy@uni.edu", "expertise": "Physics, Electronics", "workload_cap": 2, "available": True},
+	# 	{"id": 3, "name": "Dr. Mehta", "email": "mehta@uni.edu", "expertise": "Computer Science, Data Science", "workload_cap": 4, "available": True},
+	# ]
 
-    # Students
-    s1 = models.Student(name="Aarav", roll_number="21CS001", email="aarav@uni.edu", year=1, branch="CSE")
-    s2 = models.Student(name="Ananya", roll_number="21CS002", email="ananya@uni.edu", year=1, branch="CSE")
+	# timeslots = [
+	# 	{"id": 1, "day": "Mon", "start_time": "09:00", "end_time": "10:00"},
+	# 	{"id": 2, "day": "Mon", "start_time": "10:00", "end_time": "11:00"},
+	# 	{"id": 3, "day": "Wed", "start_time": "14:00", "end_time": "15:00"},
+	# 	{"id": 4, "day": "Fri", "start_time": "09:00", "end_time": "10:00"},
+	# ]
 
-    db.add_all([s1, s2])
-    db.commit()
+	# classrooms = [
+	# 	{"id": 1, "room_number": "A101", "capacity": 60, "building": "Block A", "resources": "Projector"},
+	# 	{"id": 2, "room_number": "B202", "capacity": 40, "building": "Block B", "resources": "Lab, Projector"},
+	# ]
 
-    # Enrollments (initial)
-    e1 = models.Enrollment(student_id=s1.id, course_id=math1.id)
-    e2 = models.Enrollment(student_id=s1.id, course_id=phy1.id)
+	# courses = [
+	# 	{"id": 1, "code": "MATH101", "name": "Calculus I", "credits": 3, "semester": 1, "mandatory": True, "faculty_id": 1, "timeslot_id": 1, "classroom_id": 1, "max_seats": 50},
+	# 	{"id": 2, "code": "MATH101", "name": "Calculus I", "credits": 3, "semester": 1, "mandatory": True, "faculty_id": 1, "timeslot_id": 3, "classroom_id": 1, "max_seats": 50},
+	# 	{"id": 3, "code": "PHY101", "name": "Physics I", "credits": 4, "semester": 1, "mandatory": True, "faculty_id": 2, "timeslot_id": 2, "classroom_id": 2, "max_seats": 40},
+	# 	{"id": 4, "code": "CS101", "name": "Introduction to Programming", "credits": 4, "semester": 1, "mandatory": False, "faculty_id": 3, "timeslot_id": 4, "classroom_id": 2, "max_seats": 45},
+	# ]
 
-    db.add_all([e1, e2])
-    db.commit()
+	# students = [
+	# 	{"id": 1, "name": "Aarav", "roll_number": "21CS001", "email": "aarav@uni.edu", "year": 1, "branch": "CSE"},
+	# 	{"id": 2, "name": "Ananya", "roll_number": "21CS002", "email": "ananya@uni.edu", "year": 1, "branch": "CSE"},
+	# ]
 
-    print("✅ Database seeded successfully with sample data.")
+	# enrollments = [
+	# 	{"id": 1, "student_id": 1, "course_id": 1},
+	# 	{"id": 2, "student_id": 1, "course_id": 3},
+	# ]
+
+	# Helper to insert and print response
+	def insert(table: str, rows: list):
+		try:
+			resp = supabase_client.table(table).insert(rows).execute()
+			data = _extract_data(resp)
+			print(f"Inserted into {table}: {data if data is not None else 'OK'}")
+			return data
+		except Exception as exc:
+			print(f"Failed to insert into {table}: {exc}")
+			raise
+
+	# # Insert in order
+	# insert("faculty", faculties)
+	# insert("timeslots", timeslots)
+	# insert("classrooms", classrooms)
+	# insert("courses", courses)
+	# insert("students", students)
+	# insert("enrollments", enrollments)
+
+	print("✅ Supabase seed completed.")
+
+
+def main():
+	if not supabase:
+		print("Supabase client not configured. Please set SUPABASEURL and SUPABASEKEY and ensure the supabase package is installed.")
+		sys.exit(1)
+
+	seed_using_supabase(supabase)
+
 
 if __name__ == "__main__":
-    seed()
+	main()

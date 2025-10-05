@@ -1,9 +1,12 @@
 # backend/services/optimizer.py
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
+
 from models import Course, Faculty, DisruptionLog, OptimizationResult
 from utils.scoring import score_solution
+
 from datetime import datetime
+
 
 def find_candidate_faculty(db: Session, course: Course) -> List[Dict[str, Any]]:
     """
@@ -12,7 +15,7 @@ def find_candidate_faculty(db: Session, course: Course) -> List[Dict[str, Any]]:
       - Return dicts with current workload computed
     """
     facs = db.query(Faculty).all()
-    candidates = []
+    candidates: List[Dict[str, Any]] = []
     for f in facs:
         # compute current workload (number of courses assigned)
         cur_workload = db.query(Course).filter(Course.faculty_id == f.id).count()
@@ -22,12 +25,13 @@ def find_candidate_faculty(db: Session, course: Course) -> List[Dict[str, Any]]:
             "expertise": f.expertise or "",
             "workload": cur_workload,
             "workload_cap": f.workload_cap or 3,
-            "available": f.available
+            "available": getattr(f, "available", True),
         })
     # filter out same faculty assigned to course (or optionally exclude faculty_unavailable)
     return candidates
 
-def optimize_faculty_assignment(db: Session, course_id: int, faculty_unavailable: int ) -> List[Dict[str, Any]]:
+
+def optimize_faculty_assignment(db: Session, course_id: int, faculty_unavailable: int) -> List[Dict[str, Any]]:
     """
     For a single course, return ranked candidate replacements with scores.
     Steps:
@@ -43,7 +47,7 @@ def optimize_faculty_assignment(db: Session, course_id: int, faculty_unavailable
     candidates = find_candidate_faculty(db, course)
 
     # optionally exclude the faculty_unavailable and the current assigned faculty
-    filtered = []
+    filtered: List[Dict[str, Any]] = []
     for c in candidates:
         if faculty_unavailable and c["id"] == faculty_unavailable:
             continue
@@ -51,7 +55,7 @@ def optimize_faculty_assignment(db: Session, course_id: int, faculty_unavailable
             continue
         filtered.append(c)
 
-    solutions = []
+    solutions: List[Dict[str, Any]] = []
     for cand in filtered:
         s = score_solution(cand, {"id": course.id, "name": course.name})
         rank = "Compromise"
@@ -62,17 +66,24 @@ def optimize_faculty_assignment(db: Session, course_id: int, faculty_unavailable
         solutions.append({
             "faculty": cand,
             "score": s,
-            "rank": rank
+            "rank": rank,
         })
 
     solutions.sort(key=lambda x: x["score"], reverse=True)
     return solutions
 
+
 def record_disruption_and_solutions(db: Session, course_id: int, faculty_unavailable: int, reason: str) -> Dict[str, Any]:
     """
     Create disruption log entry and compute candidate solutions, store them in optimization_results table for auditing.
     """
-    disruption = DisruptionLog(course_id=course_id, faculty_unavailable=faculty_unavailable, reason=reason, timestamp=datetime.utcnow(), status="pending")
+    disruption = DisruptionLog(
+        course_id=course_id,
+        faculty_unavailable=faculty_unavailable,
+        reason=reason,
+        timestamp=datetime.utcnow(),
+        status="pending",
+    )
     db.add(disruption)
     db.commit()
     db.refresh(disruption)
@@ -85,11 +96,12 @@ def record_disruption_and_solutions(db: Session, course_id: int, faculty_unavail
             candidate_faculty_id=s["faculty"]["id"],
             score=s["score"],
             rank=s["rank"],
-            approved=False
+            approved=False,
         )
         db.add(orow)
     db.commit()
     return {"disruption_id": disruption.id, "solutions_count": len(sols)}
+
 
 def apply_reassignment(db: Session, course_id: int, new_faculty_id: int, resolved_by: str = "system") -> Dict[str, Any]:
     """
@@ -101,7 +113,7 @@ def apply_reassignment(db: Session, course_id: int, new_faculty_id: int, resolve
         return {"success": False, "message": "Course not found"}
 
     old_faculty = course.faculty_id
-    setattr(course, "faculty_id", new_faculty_id)  # Assign to the instance attribute
+    setattr(course, "faculty_id", new_faculty_id)
     db.add(course)
 
     # Update any disruption logs referencing old_faculty for this course and mark resolved

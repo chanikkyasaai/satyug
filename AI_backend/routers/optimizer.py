@@ -1,14 +1,14 @@
 # backend/routers/optimizer.py
 from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_supabase
 from services.optimizer import optimize_faculty_assignment, record_disruption_and_solutions, apply_reassignment
 from typing import Dict, Any
 
 router = APIRouter(prefix="/optimizer", tags=["Tier3"])
 
 @router.post("/reassign")
-def api_reassign(course_id: int, faculty_unavailable: int , reason: str = "", db: Session = Depends(get_db)):
+def api_reassign(course_id: int, faculty_unavailable: int , reason: str = "", db: Session = Depends(get_supabase)):
     """
     Admin triggers a reassign computation when a faculty becomes unavailable.
     Returns ranked candidate solutions.
@@ -25,7 +25,7 @@ def api_reassign(course_id: int, faculty_unavailable: int , reason: str = "", db
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/approve")
-def api_approve_reassignment(course_id: int = Body(...), new_faculty_id: int = Body(...), admin_name: str = Body("admin"), db: Session = Depends(get_db)):
+def api_approve_reassignment(course_id: int = Body(...), new_faculty_id: int = Body(...), admin_name: str = Body("admin"), db: Session = Depends(get_supabase)):
     """
     Admin approves and applies the reassignment. This updates Course.faculty_id and resolves disruptions.
     """
