@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Student(Base):   
     __tablename__ = "students"
@@ -74,7 +74,7 @@ class Enrollment(Base):
     id = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"))
     course_id = Column(Integer, ForeignKey("courses.id"))
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))  # Corrected line
 
     student = relationship("Student", back_populates="enrollments")
     course = relationship("Course", back_populates="enrollments")
@@ -86,7 +86,7 @@ class DisruptionLog(Base):
     course_id = Column(Integer, ForeignKey("courses.id"))
     faculty_unavailable = Column(Integer, ForeignKey("faculty.id"))
     reason = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     status = Column(String, default="pending")  # pending/resolved
     resolved_by = Column(String, nullable=True)
 

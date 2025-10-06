@@ -1,6 +1,6 @@
 # backend/main.py
 from fastapi import FastAPI
-from routers import registration, optimizer
+from routers import registration, optimizer, crud
 from database import engine
 import models
 
@@ -10,6 +10,7 @@ app = FastAPI(title="SAT-YUG")
 
 app.include_router(registration.router)
 app.include_router(optimizer.router)
+app.include_router(crud.router)
 
 @app.get("/")
 def root():
