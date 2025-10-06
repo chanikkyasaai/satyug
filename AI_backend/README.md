@@ -25,6 +25,25 @@ The backend expects these environment variables (recommended in a `.env` file fo
 - `SUPABASEKEY` — API key (anon or service_role depending on operation). For DDL and direct Postgres operations use the `SERVICE_ROLE` key or provide `SUPABASEPASS` (see below).
 - `SUPABASEPASS` — (optional) the Postgres password to build a direct SQLAlchemy DB URL when needed for create_all. If omitted you may still use the Supabase client for CRUD.
 
+If you want to enable the Gemini/Generative Language assistant, add:
+
+- `GOOGLE_API_KEY` — your Google Cloud API key with access to the Generative Language API (or set up the proper auth for the Google Cloud project). Example: `GOOGLE_API_KEY=AIza...`
+- `GEN_AI_MODEL` — optional, model id (default `chat-bison-001`)
+
+Assistant endpoint
+------------------
+
+POST /assistant/chat
+
+- Body: JSON array of messages: [{"role":"user|system|assistant","content":"..."}, ...]
+- Returns: {"reply": "assistant text"}
+
+Example:
+
+```powershell
+curl -X POST "http://localhost:8000/assistant/chat" -H "Content-Type: application/json" -d '[{"role":"user","content":"Find me a 3-credit humanities course on Friday afternoon that does not clash with my major."}]'
+```
+
 If you want to run `models.Base.metadata.create_all(bind=engine)` (create tables from SQLAlchemy models), `database.py` needs `SUPABASEPASS` so it can build a direct Postgres connection string (service role or DB password is required by Postgres). Otherwise use Supabase migrations from the dashboard.
 
 APIs
