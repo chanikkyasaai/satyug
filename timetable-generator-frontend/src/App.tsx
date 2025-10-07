@@ -1,16 +1,16 @@
-import './App.css'
-import { AuthProvider, useAuth } from './components/auth/AuthContext'
-import Login from './components/Login'
-import Signup from './components/Signup'
-import DashboardRouter from './components/DashboardRouter'
-import { useState } from 'react'
+import "./App.css";
+import { AuthProvider, useAuth } from "./components/auth/AuthContext";
+import Login from "./components/Login";
+import Signup from "./components/Signup";
+import DashboardRouter from "./components/DashboardRouter";
+import { useState } from "react";
 
 function AppContent() {
-  const { isAuthenticated } = useAuth()
-  const [showSignup, setShowSignup] = useState(false)
+  const { isAuthenticated } = useAuth();
+  const [showSignup, setShowSignup] = useState(false);
 
   if (isAuthenticated) {
-    return <DashboardRouter />
+    return <DashboardRouter />;
   }
 
   return (
@@ -20,12 +20,12 @@ function AppContent() {
           onClick={() => setShowSignup((v) => !v)}
           className="px-3 py-1.5 rounded-md bg-white/80 backdrop-blur border text-sm font-medium hover:bg-white"
         >
-          {showSignup ? 'Have an account? Log in' : "New here? Create account"}
+          {showSignup ? "Have an account? Log in" : "New here? Create account"}
         </button>
       </div>
       {showSignup ? <Signup /> : <Login />}
     </div>
-  )
+  );
 }
 
 function App() {
@@ -33,7 +33,7 @@ function App() {
     <AuthProvider>
       <AppContent />
     </AuthProvider>
-  )
+  );
 }
 
-export default App
+export default App;
