@@ -137,3 +137,14 @@ class OptimizationResultOut(OptimizationResultBase):
     id: int
     class Config:
         orm_mode = True
+
+
+class IngestBody(BaseModel):
+    title: str
+    source: str
+    text: str
+    role_visibility: Optional[str] = None
+    chunk_size: int = 500
+    overlap: int = 100
+
+
