@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime, timezone
@@ -99,3 +100,15 @@ class OptimizationResult(Base):
     score = Column(Integer)
     rank = Column(String)  # Best / Good / Compromise
     approved = Column(Boolean, default=False)
+
+class ForecastResult(Base):
+    __tablename__ = "forecast_results"
+
+    id = Column(Integer, primary_key=True, index=True)
+    course_code = Column(String, index=True)
+    course_name = Column(String)
+    predicted_enrollment = Column(Integer)
+    recommended_sections = Column(Integer)
+    recommended_faculty = Column(String)
+    faculty_score = Column(Float)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
