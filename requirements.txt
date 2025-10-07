@@ -28,3 +28,12 @@ httpx==0.27.0
 # anyio==4.4.0              # Async compatibility
 
 supabase==2.21.1
+
+# Statsmodels
+statsmodels==0.14.4
+
+# XGBoost
+xgboost==2.1.1
+
+numpy==1.26.4
+pandas==2.1.3

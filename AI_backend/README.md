@@ -15,6 +15,8 @@ Repository layout (relevant files)
 - `routers/optimizer.py` — endpoints for handling faculty reassignments and optimizations.
 - `services/solver.py` — solver/validation logic (supabase-aware).
 - `services/optimizer.py` — optimization logic (supabase-aware).
+ - `routers/get_timetable.py` — endpoints to fetch weekly timetables for students and faculty.
+ - `services/timetable_service.py` — builds Mon–Fri weekly timetable structures.
 
 Environment
 -----------
@@ -25,12 +27,31 @@ The backend expects these environment variables (recommended in a `.env` file fo
 - `SUPABASEKEY` — API key (anon or service_role depending on operation). For DDL and direct Postgres operations use the `SERVICE_ROLE` key or provide `SUPABASEPASS` (see below).
 - `SUPABASEPASS` — (optional) the Postgres password to build a direct SQLAlchemy DB URL when needed for create_all. If omitted you may still use the Supabase client for CRUD.
 
+If you want to enable the Gemini/Generative Language assistant, add:
+
+- `GOOGLE_API_KEY` — your Google Cloud API key with access to the Generative Language API (or set up the proper auth for the Google Cloud project). Example: `GOOGLE_API_KEY=AIza...`
+- `GEN_AI_MODEL` — optional, model id (default `chat-bison-001`)
+
+Assistant endpoint
+------------------
+
+POST /assistant/chat
+
+- Body: JSON array of messages: [{"role":"user|system|assistant","content":"..."}, ...]
+- Returns: {"reply": "assistant text"}
+
+Example:
+
+```powershell
+curl -X POST "http://localhost:8000/assistant/chat" -H "Content-Type: application/json" -d '[{"role":"user","content":"Find me a 3-credit humanities course on Friday afternoon that does not clash with my major."}]'
+```
+
 If you want to run `models.Base.metadata.create_all(bind=engine)` (create tables from SQLAlchemy models), `database.py` needs `SUPABASEPASS` so it can build a direct Postgres connection string (service role or DB password is required by Postgres). Otherwise use Supabase migrations from the dashboard.
 
 APIs
 ----
 
-Base URL: the FastAPI server will run (by default) on the host/port you specify when running uvicorn. The app registers two routers: `/registration` and `/optimizer`.
+Base URL: the FastAPI server will run (by default) on the host/port you specify when running uvicorn. The app registers routers: `/registration`, `/optimizer`, `/api` (CRUD), `/assistant`, and `/api/timetable`.
 
 1) POST /registration/validate
 
@@ -74,6 +95,32 @@ Base URL: the FastAPI server will run (by default) on the host/port you specify 
   - `new_faculty_id` (int)
   - `admin_name` (str, optional)
 - Response: message and result structure indicating success.
+
+5) GET /api/timetable/student/{student_id}
+
+- Purpose: Return a weekly timetable for a student, grouped Mon–Fri.
+- Response shape:
+
+  {
+    "Mon": [ { "courseId": int, "courseCode": str, "courseName": str, "startTime": "HH:MM", "endTime": "HH:MM", "classroom": { "roomNumber": str, "building": str } | null, "faculty": { "id": int, "name": str } | null } ],
+    "Tue": [ ... ],
+    "Wed": [ ... ],
+    "Thu": [ ... ],
+    "Fri": [ ... ]
+  }
+
+6) GET /api/timetable/faculty/{faculty_id}
+
+- Purpose: Return a weekly timetable for a faculty member, grouped Mon–Fri.
+- Response shape (similar to student, but without `faculty` field inside entries):
+
+  {
+    "Mon": [ { "courseId": int, "courseCode": str, "courseName": str, "startTime": "HH:MM", "endTime": "HH:MM", "classroom": { "roomNumber": str, "building": str } | null } ],
+    "Tue": [ ... ],
+    "Wed": [ ... ],
+    "Thu": [ ... ],
+    "Fri": [ ... ]
+  }
 
 Data models (quick reference)
 -----------------------------
@@ -146,6 +193,18 @@ Approve a reassignment:
 
 ```bash
 curl -X POST "http://localhost:8000/optimizer/approve" -H "Content-Type: application/json" -d '{"course_id":5,"new_faculty_id":3,"admin_name":"alice"}'
+```
+
+Get a student's weekly timetable:
+
+```bash
+curl -X GET "http://localhost:8000/api/timetable/student/1"
+```
+
+Get a faculty's weekly timetable:
+
+```bash
+curl -X GET "http://localhost:8000/api/timetable/faculty/2"
 ```
 
 Further work and recommendations
