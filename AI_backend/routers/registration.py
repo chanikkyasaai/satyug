@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-from database import get_supabase
+from database import get_supabase  # Ensure this is the correct import for your DB session
 from services.solver import validate_schedule, enroll_student
 from models import Enrollment
 from schemas import EnrollmentCreate, EnrollmentOut
@@ -36,5 +36,11 @@ def api_enroll(enroll_in: EnrollmentCreate, db = Depends(get_supabase)):
         raise HTTPException(status_code=400, detail=result.get("message", "Could not enroll"))
 
     # fetch enrollment to return
-    enrollment = db.query(Enrollment).filter(Enrollment.id == result["enrollment_id"]).first()
+    # enrollment = db.table("enrollments").select("*").eq("id", result["enrollment"]).limit(1).execute()
+    # return enrollment
+    print(result)
+    # Ensure result["enrollment"] is a dict/object, not a list
+    enrollment = result["enrollment"]
+    if isinstance(enrollment, list) and len(enrollment) > 0:
+        enrollment = enrollment[0]
     return enrollment

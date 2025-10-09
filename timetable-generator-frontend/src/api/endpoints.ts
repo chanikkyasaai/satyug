@@ -106,3 +106,48 @@ export const OptimizationResultsAPI = {
 };
 
 
+// Assistant (Chat)
+export const AssistantAPI = {
+  chat: (text: string, userId: number, role: "student" | "admin") =>
+    api.post<any>(
+      `/assistant/chat`,
+      { text },
+      { headers: { "X-User-Id": String(userId), "X-User-Role": role ,"Content-Type":"application/json"} }
+    ),
+  ensureSchema: (userId: number, role: "student" | "admin") =>
+    api.post<any>(
+      "/assistant/knowledge/ensure_schema",
+      {},
+      { headers: { "X-User-Id": String(userId), "X-User-Role": role } }
+    ),
+  seedSchema: (userId: number, role: "student" | "admin") =>
+    api.post<any>(
+      "/assistant/knowledge/seed_schema",
+      {},
+      { headers: { "X-User-Id": String(userId), "X-User-Role": role } }
+    ),
+  ingestFile: (
+    path: string,
+    opts: { title?: string; role_visibility?: string; chunk_size?: number; overlap?: number },
+    userId: number,
+    role: "student" | "admin"
+  ) =>
+    api.post<any>(
+      "/assistant/knowledge/ingest_file",
+      { path, ...opts },
+      { headers: { "X-User-Id": String(userId), "X-User-Role": role } }
+    ),
+  ingestDir: (
+    directory: string,
+    opts: { role_visibility?: string } | undefined,
+    userId: number,
+    role: "student" | "admin"
+  ) =>
+    api.post<any>(
+      "/assistant/knowledge/ingest_dir",
+      { directory, ...(opts || {}) },
+      { headers: { "X-User-Id": String(userId), "X-User-Role": role } }
+    ),
+};
+
+

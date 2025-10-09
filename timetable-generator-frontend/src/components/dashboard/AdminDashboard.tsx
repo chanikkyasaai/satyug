@@ -7,6 +7,7 @@ import InfrastructureManagement from "../management/InfrastructureManagement";
 import TimeslotManagement from "../management/TimeslotManagement";
 import ClassroomManagement from "../management/ClassroomManagement";
 import { OptimizerAPI } from "../../api/endpoints";
+import ChatWidget from "../ChatWidget";
 
 export default function AdminDashboard() {
   const { userEmail, logout } = useAuth();
@@ -100,15 +101,15 @@ export default function AdminDashboard() {
             </button>
 
             <button
-              onClick={async () => {
-                try {
-                  // Example: approve course 1 to new faculty 2
-                  await OptimizerAPI.approve(1, 2, "admin");
-                  alert("Reassignment approved and applied");
-                } catch (e: any) {
-                  alert(e?.message || "Failed to approve reassignment");
-                }
-              }}
+              // onClick={async () => {
+              //   try {
+              //     // Example: approve course 1 to new faculty 2
+              //     await OptimizerAPI.approve(1, 2, "admin");
+              //     alert("Reassignment approved and applied");
+              //   } catch (e: any) {
+              //     alert(e?.message || "Failed to approve reassignment");
+              //   }
+              // }}
               className="group p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200 hover:border-green-300"
             >
               <div className="flex items-center gap-3">
@@ -247,6 +248,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       </main>
+      <ChatWidget userId={1} role="admin" />
     </div>
   );
 }

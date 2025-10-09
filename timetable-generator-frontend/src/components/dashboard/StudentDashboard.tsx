@@ -1,6 +1,7 @@
 import { useAuth } from "../auth/AuthContext";
 import { useRef, useState } from "react";
 import { RegistrationAPI } from "../../api/endpoints";
+import ChatWidget from "../ChatWidget";
 // excel export will be loaded dynamically to avoid type resolution issues
 
 export default function StudentDashboard() {
@@ -475,6 +476,7 @@ export default function StudentDashboard() {
           <div className="space-y-6"></div>
         </div>
       </main>
+      <ChatWidget userId={1} role="student" />
     </div>
   );
 }
